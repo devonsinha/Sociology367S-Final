@@ -1,0 +1,278 @@
+---
+title: "CleanedFinalProj"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+###Importing all the necessary libraries
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+library(tidytext)
+library(tm)
+library(wordcloud)
+library(wordcloud2)
+library(RColorBrewer)
+library(topicmodels)
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+##reading in our data
+reddit<-read_csv("file_name.csv")
+eMFD<- read_csv("eMFD_wordlist.csv")
+liberals<-reddit %>% filter(`Political Lean`=="Liberal")
+conservatives<-reddit %>% filter(`Political Lean`=="Conservative")
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#understanding the data
+toPlot<-reddit %>% group_by(`Political Lean`) %>% summarise(n=n())
+ggplot(data=toPlot, aes(x=`Political Lean`, y=n,fill=`Political Lean`))+
+  geom_bar(stat="identity") +
+  scale_fill_manual(values=c(
+                             "red",
+                             "darkblue"))
+
+reddit %>% group_by(Subreddit) %>% summarise(n=n())
+```
+We have posts from the subreddit groups: alltheleft, anarchocapitalism, Capitalism, Communist, conservatives, DemocraticSocialism, democrats, feminisms, Liberal, Libertarian, progressive, RadicalFeminism, republicans, SocialDemocracy, socialism.
+
+```{r, include=FALSE}
+libPlot<-liberals %>% group_by(Subreddit) %>% summarise(n=n()) %>% arrange(desc(n))
+consPlot<-conservatives %>% group_by(Subreddit) %>% summarise(n=n()) %>% arrange(desc(n))
+
+ggplot(libPlot, aes(reorder(Subreddit, -n ), n, fill=Subreddit))+geom_bar(stat="identity")+coord_flip()
+
+ggplot(consPlot, aes(reorder(Subreddit, -n ), n, fill=Subreddit))+geom_bar(stat="identity")+coord_flip()
+
+#removing plots from environment in order to avoid confusion
+rm(consPlot, libPlot, toPlot)
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+#count of words used in left leaning posts
+libCloud<-liberals %>% unnest_tokens('word', Title) %>% group_by(word) %>% count() %>% arrange(desc(n)) %>% anti_join(stop_words) %>% filter(nchar(word)>2)
+
+#count of words used in right leaning posts
+consCloud<-conservatives %>% unnest_tokens('word', Title) %>% group_by(word) %>% count() %>% arrange(desc(n)) %>% anti_join(stop_words) %>% filter(nchar(word)>2)
+
+set.seed(1234) # for reproducibility 
+wordcloud(words = libCloud$word, freq = libCloud$n, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"), scale=c(4,.2), main="title")
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+wordcloud(words = consCloud$word, freq = consCloud$n, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"), scale=c(4,.3), main="title")
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+#filter is to remove numbers from appearing in our words
+libDtm<-liberals %>% unnest_tokens('word', Title) %>% anti_join(stop_words) %>%  filter(is.na(as.numeric(substr(word, 1, 1)))) %>% group_by(word) %>% count(Id,word) %>% cast_dtm(Id, word, n)
+
+#filter is to remove numbers from appearing in our words
+consDtm<-conservatives %>% unnest_tokens('word', Title) %>% anti_join(stop_words) %>%  filter(is.na(as.numeric(substr(word, 1, 1)))) %>% group_by(word) %>% count(Id,word) %>% cast_dtm(Id, word, n)
+
+#creating topic models from dtms
+libTm<-LDA(libDtm, k=5, control=list(seed=1111))
+consTm<-LDA(consDtm, k=5, control=list(seed=2222))
+
+libTopics<-tidy(libTm, matrix="beta")
+consTopics<-tidy(consTm, matrix="beta")
+
+#getting top topics for each group and preparing them to be graphed
+libTop10<-libTopics %>% group_by(topic) %>% top_n(7, beta) %>% ungroup() %>% arrange(topic, -beta)
+consTop10<-consTopics %>% group_by(topic) %>% top_n(7, beta) %>% ungroup() %>% arrange(topic, -beta)
+
+#creating tm graphs below
+libTop10 %>% mutate(term=reorder(term, beta)) %>%  mutate(topic=paste("Topic #", topic)) %>% ggplot(aes(term, beta, fill=factor(topic)))+geom_col(show.legend=FALSE)+facet_wrap(~ topic, scales="free")+theme_minimal()+theme(plot.title=element_text(hjust=.5, size=18))+labs(title="Top 5 Topics for Liberal's Posts on Reddit") + ylab("")+xlab("")+coord_flip()
+
+consTop10 %>% mutate(term=reorder(term, beta)) %>%  mutate(topic=paste("Topic #", topic)) %>% ggplot(aes(term, beta, fill=factor(topic)))+geom_col(show.legend=FALSE)+facet_wrap(~ topic, scales="free")+theme_minimal()+theme(plot.title=element_text(hjust=.5, size=18))+labs(title="Top 5 Topics for Conservative's Posts on Reddit") + ylab("")+xlab("")+coord_flip()
+
+#removing saved tm variables from enviorment as I won't use for rest of project
+rm(libTop10, consTop10, libTopics, consTopics, libTm, consTm)
+
+rm(libDtm, libCloud, consCloud, consDtm)
+```
+
+```{r, include=FALSE, message=FALSE, warning=FALSE}
+#Predictions going here
+set.seed(650)
+
+#evening number of liberals posts to = conservative amount
+libEq<-sample_n(liberals, 4535)
+
+toSplit<-rbind(conservatives,libEq)
+
+#making environment less packed
+rm(libEq)
+
+#preparing our training and testing data
+counts <- map_df(1:2,
+                      ~ unnest_tokens(toSplit, word, Title, 
+                                      token = "ngrams", n = .x)) %>% 
+  filter(is.na(as.numeric(substr(word, 1, 1)))) %>% 
+  anti_join(stop_words, by = "word") %>%
+  count(Id, word, sort = TRUE)
+
+
+counts1<-counts
+##reweighting the words based on the eMFD dictionary 
+
+#If YOU COMMENT OUT NEXT 4 LINES OF CODE, MODEL RUNS W/O weightings! 
+t3<-counts %>% inner_join(eMFD)
+t3<-t3 %>% mutate(n1= n *(1+care_p + fairness_p + loyalty_p + authority_p + sanctity_p + abs(care_sent) + abs(fairness_sent) + abs(loyalty_sent) + abs(authority_sent) + abs(sanctity_sent))) %>% select(Id, word, n1) %>% rename(n=n1)
+counts<-counts %>% anti_join(t3 %>% select(word))
+counts<-rbind(counts,t3)
+
+#filtering for words that appear more than 10x(training) and 5x(testing). 
+counts_10 <- counts %>%
+  group_by(word) %>%
+  summarise(n = n()) %>% 
+  filter(n >= 10) %>%
+  select(word)
+
+countsCopy <- counts %>%
+  right_join(counts_10, by = "word") %>% drop_na()
+
+dtm<-countsCopy %>%
+  bind_tf_idf(word, Id, n) %>%
+  cast_dtm(Id, word, tf_idf)
+
+#testing_dtm <- testing_counts %>%
+  #right_join(testing_10, by = "word") %>%
+  #drop_na() %>% 
+  #bind_tf_idf(word, Id, n) %>%
+  #cast_dtm(Id, word, tf_idf)
+
+dtm<-dtm %>% as.matrix() %>% as.data.frame()
+
+# Split Data into Training and Testing in R 
+set.seed(777)
+sample_size = floor(0.8*nrow(dtm))
+
+# randomly split data in r
+picked = sample(seq_len(nrow(dtm)),size = sample_size)
+training_dtm =dtm[picked,]
+testing_dtm =dtm[-picked,]
+
+#training_dtm<-training_dtm %>% as.matrix() %>% as.data.frame()
+#testing_dtm<-testing_dtm %>% as.matrix() %>% as.data.frame()
+
+rm(training_counts, training_10, testing_counts, testing_10)
+
+#code to create a vector corresponding to variable outputs
+reddit_ID<-reddit %>% select(Id,`Political Lean`)
+
+#getting Ids as a column
+training_dtm <- tibble::rownames_to_column(training_dtm, "VALUE") %>% rename(Id=VALUE)
+testing_dtm<-tibble::rownames_to_column(testing_dtm, "VALUE") %>% rename(Id=VALUE)
+training_dtm<-training_dtm %>% arrange(desc(Id))
+testing_dtm<-testing_dtm %>% arrange(desc(Id))
+
+t1<-testing_dtm %>% select(Id)
+t2<-training_dtm %>% select(Id)
+testOutcomes<-reddit_ID %>% inner_join(t1, by="Id") %>% arrange(desc(Id))
+trainOutcomes<-reddit_ID %>% inner_join(t2, by="Id") %>% arrange(desc(Id))
+testOutcomes<-testOutcomes$`Political Lean`
+trainOutcomes<-trainOutcomes$`Political Lean`
+
+training_dtm<-training_dtm %>% select(-Id)
+testing_dtm<-testing_dtm %>% select(-Id)
+rm(t1, t2)
+
+#key info: test_dtm 
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(caret)
+trctrl <- trainControl(method = "none")
+svm_mod <- train(x = training_dtm,
+                 y = as.factor(trainOutcomes),
+                 method = "svmLinearWeights2",
+                 trControl = trctrl,
+                 tuneGrid = data.frame(cost = 1, 
+                                       Loss = 0, 
+
+                                                                           weight = 1))
+
+## Need to split train and test so that dtm has the same words
+svm_pred <- predict(svm_mod,
+                    newdata = testing_dtm)
+svm_cm <- confusionMatrix(svm_pred, as.factor(testOutcomes))
+svm_cm
+
+#nb_mod <- train(x = training_dtm,
+            #    y = as.factor(trainOutcomes),
+            #    method = "naive_bayes",
+            #    trControl = trctrl,
+            #    tuneGrid = data.frame(laplace = 0,
+            #                          usekernel = FALSE,
+             #                         adjust = FALSE))
+
+#nb_pred <- predict(nb_mod,
+        #           newdata = testing_dtm)
+
+#nb_cm <- confusionMatrix(nb_pred, as.factor(testOutcomes))
+#nb_cm
+
+
+#logitboost_mod <- train(x = training_dtm,
+              #          y = as.factor(trainOutcomes),
+                #        method = "LogitBoost",
+              #          trControl = trctrl)
+
+
+#logitboost_pred <- predict(logitboost_mod,
+           #                newdata = testing_dtm)
+
+
+#logitboost_cm <- confusionMatrix(logitboost_pred, as.factor(testOutcomes))
+#logitboost_cm
+
+
+#rf_mod <- train(x = training_dtm, 
+             #   y = as.factor(trainOutcomes), 
+             #   method = "ranger",
+              #  trControl = trctrl,
+              #  tuneGrid = data.frame(mtry = floor(sqrt(dim(training_dtm)[2])),
+                  #                    splitrule = "gini",
+                  #                    min.node.size = 1))
+
+
+#rf_pred <- predict(rf_mod,
+             #      newdata = testing_dtm)
+
+
+#rf_cm <- confusionMatrix(rf_pred, as.factor(testOutcomes))
+#rf_cm
+
+#nnet_mod <- train(x = training_dtm,
+                  #  y = as.factor(trainOutcomes),
+                 #   method = "nnet",
+                 #   trControl = trctrl,
+                  #  tuneGrid = data.frame(size = 1,
+                  #                        decay = 5e-4),
+                  #  MaxNWts = 5000)
+
+
+#nnet_pred <- predict(nnet_mod,
+                    # newdata = testing_dtm)
+
+#nnet_cm <- confusionMatrix(nnet_pred, as.factor(testOutcomes))
+#nnet_cm
+
+plt <- as.data.frame(svm_cm$table)
+plt$Prediction <- factor(plt$Prediction, levels=rev(levels(plt$Prediction)))
+ggplot(plt, aes(Prediction,Reference, fill= Freq)) +
+        geom_tile() + geom_text(aes(label=Freq)) +
+        scale_fill_gradient(low="white", high="#009194") +
+        labs(x = "Political Lean",y = "Prediction") +
+        scale_x_discrete(labels=c("Liberal","Conservative")) +
+        scale_y_discrete(labels=c("Conservative","Liberal"))
+```
+https://www.emilhvitfeldt.com/post/2018-03-31-binary-text-classification-with-tidytext-and-caret/
+^Help with running the models
+
