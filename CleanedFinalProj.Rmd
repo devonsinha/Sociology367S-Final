@@ -1,11 +1,51 @@
 ---
-title: "CleanedFinalProj"
+title: "Data Science & Society Final Project"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+## Predicting Political Lean from Textual Reddit Data
+# Devon Sinha
+# devon.sinha@duke.edu
+# 4/28/2022
+
+# Introduction
+
+In today’s ever increasing technology driven world, social media usage is at an all time high. Individuals of all ages and backgrounds engage with social media in order to stay connected with friends and family, share opinions and information, and get real time news. Of the many social media platforms, Reddit is as pervasive as any, serving as a platform for somewhat anonymous discourse on nearly any topic and having around 48 million monthly posters and 1.7 billion monthly viewers (Statista). Like other social media websites such as Twitter and Facebook, Reddit is a popular spot for users to discuss politics. Many Subreddits are dedicated towards political topics, but user discourse on current news and politics can exist in nearly any thread. However, Reddit operates somewhat differently than most other news and opinion sharing social media websites in that user information is typically very limited. Twitter has profile pictures, personal biographies, lists of followers and following, and an easily navigable timeline of user posts. Facebook is highly personable as well; the concept of friend requests and the never-ending amount of information you can explore one’s timeline and friend network allow for thorough examinations of an individual’s identity. Of course, fake profiles and “burner” accounts exist on these websites, yet the nature of these websites allows for potential investigation on an account’s validity through these sources of information. On Reddit, the norm is relative anonymity. When creating an account on Reddit, the website will suggest a username unrelated to your real name. Critical consumers do not reap the benefit of being able to deeply analyze an individual's content on Reddit. Because of this, users are often left to judging a post solely on textual clues. Thus, whether an individual believes a post to be true, biased, or alternatively motivated is largely based on content itself. 
+
+There is lots of existing research regarding how individuals interact with each other and consume information on social media, especially when it comes to social media. Some of the most important studies about information intake indicate that exposure to opposing ideological ideas often serves to further polarize the reader, and that republicans and democrats are poor at influencing individuals from the opposing party (Feinberg et al.), and overestimate their ability to do so. A lot of studies assume that the individual understands who they are interacting with. For example, there is an assumption that the individual knows whether or not the person they are interacting with shares the same political ideologies as them or a similar background. On most online outlets, this is probably true. Because of all the supplemental information included on top of textual information such as pictures, individuals can gather a (relatively) good sense of the validity or political purpose of an article or post (Spezzano et al.), although this isn’t without exceptions. This naturally begs the question of how well humans can identify motivations and falsehood in text when this supplemental information doesn’t exist. This is what makes Reddit so interesting. Existing Reddit research mostly has focused on doing this by identifying fake news, but these algorithms include numerous predictors that the average human probably doesn't take into account while browsing (Setty et al.).  This study will take a slightly different approach. Instead of focusing on fake news, this study will examine political lean, and the ability to predict the ideological identity of Reddit posters. This is the first step in determining how well an individual can determine motivations behind a post based on textual content. 
+
+An important basis for this study is the concept of Moral Foundations Theory, especially the extended Moral Foundations Dictionary. Moral Foundations Theory is a which has identified numerous differences between the core moral values between conservatives and liberals. For example, when discussing politics or even personal preferences conservatives are far more likely to cite sentiments of loyalty and sanctity, while liberals will likely mention individualization and fairness. What makes Moral Foundations Theory so interesting is these values often surface in areas beyond politics; simple questions about an individual’s life motivations can reveal these binding moral foundations (Strupp-Levitsky et al.). 
+
+
+# Hypotheses
+
+**1:** In light of the findings from the extended Moral Foundations Dictionary study, I first hypothesize that: **the moral themes outlined by Moral Foundation Theory will appear amongst conservatives’ and liberals’ posts on Reddit, especially in political Subreddits.** 
+
+**2:** As a result of this first hypothesis, I also hypothesize that: **humans can predict political lean with moderately high accuracy (~80%+), solely based on textual clues from Reddit posts. Accuracy will be bounded to moderately high because of the lack of other contextual clues in pure textual data.** 
+
+This study intends to begin the dialogue in addressing these hypotheses by modeling human behavior via text classification models. Furthermore, this study opts to analyze political Subreddits to ensure the majority of the posts are political discourse, which will help better analyze hypothesis #1 and #2.
+
+# Defintion of Terms
+
+Black box algorithm:  a term used to describe impenetrable algorithms which lack opaqueness. Black box algorithms take in inputs and spit out outputs, but it is oftentimes unclear how they are determining these outputs. 
+
+Heuristic function: A practical method that acts as a shortcut for solving a problem, although oftentimes lacks optimality or perfect rationality 
+
+Stop-words: common words that are omitted from natural language processing algorithms both to save space and because of their lack of importance in the model
+
+Document-term matrix: a mathematical matrix used to represent the frequency of words in a given document 
+
+eMFD: Abbreviation for the extended Moral Foundations Dictionary, which is a list of words and corresponding values tailored to measure moral content
+
+# Methods
+
+In terms of data, I opted to use a Kaggle dataset with information on 12854 political reddit posts classified by whether or not the user leans conservative or liberal. The dataset consists of Reddit posts ranging from early 2021 to March 2022, with a large skew towards the more recent posts. Important variables in this dataset include the title and text fields, political lean, and unique post identifier, all of which will be helpful for text classification. In addition to the Reddit dataset, I used The Extended Moral Foundations Dictionary dataset which contains a list of words associated with Moral Foundations Theory, with a breakdown based on the word’s probability and sentiment scores for the major moral themes. This dataset includes 3270 words, with moral theme probabilities bounded from 0 to 1, and sentiment scores bounded from -1 to 1. 
+
+Before building the textual classification model, I created a couple word clouds and topic models separated based on political lean. These graphs allow for an easily conductible “eye test” of our hypothesis, which is important because the text classification model will act as a black box. A brief examination of these exploratory data analysis graphs can be helpful in understanding how our model is going about making its predictions. 
+
 
 ```{r, include=FALSE}
 ###Importing all the necessary libraries
@@ -39,7 +79,6 @@ ggplot(data=toPlot, aes(x=`Political Lean`, y=n,fill=`Political Lean`))+
 
 reddit %>% group_by(Subreddit) %>% summarise(n=n())
 ```
-We have posts from the subreddit groups: alltheleft, anarchocapitalism, Capitalism, Communist, conservatives, DemocraticSocialism, democrats, feminisms, Liberal, Libertarian, progressive, RadicalFeminism, republicans, SocialDemocracy, socialism.
 
 ```{r, include=FALSE}
 libPlot<-liberals %>% group_by(Subreddit) %>% summarise(n=n()) %>% arrange(desc(n))
@@ -53,7 +92,7 @@ ggplot(consPlot, aes(reorder(Subreddit, -n ), n, fill=Subreddit))+geom_bar(stat=
 rm(consPlot, libPlot, toPlot)
 ```
 
-```{r, message=FALSE, warning=FALSE, echo=FALSE}
+```{r, message=FALSE, warning=FALSE, echo=FALSE, fig.width=16, fig.height=6}
 #count of words used in left leaning posts
 libCloud<-liberals %>% unnest_tokens('word', Title) %>% group_by(word) %>% count() %>% arrange(desc(n)) %>% anti_join(stop_words) %>% filter(nchar(word)>2)
 
@@ -64,11 +103,11 @@ set.seed(1234) # for reproducibility
 wordcloud(words = libCloud$word, freq = libCloud$n, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"), scale=c(4,.2), main="title")
 ```
 
-```{r, message=FALSE, warning=FALSE, echo=FALSE}
+```{r, message=FALSE, warning=FALSE, echo=FALSE, fig.width=16, fig.height=6}
 wordcloud(words = consCloud$word, freq = consCloud$n, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"), scale=c(4,.3), main="title")
 ```
 
-```{r, message=FALSE, warning=FALSE, echo=FALSE}
+```{r, message=FALSE, warning=FALSE, echo=FALSE, fig.width=16, fig.height=6}
 #filter is to remove numbers from appearing in our words
 libDtm<-liberals %>% unnest_tokens('word', Title) %>% anti_join(stop_words) %>%  filter(is.na(as.numeric(substr(word, 1, 1)))) %>% group_by(word) %>% count(Id,word) %>% cast_dtm(Id, word, n)
 
@@ -97,6 +136,17 @@ rm(libTop10, consTop10, libTopics, consTopics, libTm, consTm)
 rm(libDtm, libCloud, consCloud, consDtm)
 ```
 
+From the word clouds, it is evident that many of the most frequently used words in one cloud are frequent in the other as well. Trump and Biden are among the most common words in both clouds, which makes sense as these are figures that will be discussed frequently regardless of party, albeit oftentimes with varying sentiment. However, aside from words in the same vein as Trump and Biden, there are some evident differences between the clouds. Words like workers, women, and election are much larger weighted in the left-leaning cloud, whereas words such as Ukraine, capitalism, and freedom are more prevalent for the right-leaning cloud. For the topic modeling graphs, there is more of the same. There is a fair amount of overlap in the types of words amongst all topics, but upon looking at the whole list there clearly exists a difference between the liberal and conservative most frequent models. These differences bode well for our model. They suggest that our model should be capable of predicting liberal versus conservative posts with some accuracy as there are easily identifiable differences between the most frequent words and topics prevalent in the Reddit posts.
+
+
+
+
+After completing exploratory data analysis, I created a text classification model in order to predict political lean solely based on the textual evidence of political Reddit posts. I opted to use a bag of words approach, which entails counting the frequency of given words in a Reddit post, and using this as the main parameter to train our model. In order to prevent overfitting, I only use words that are non-stop-words that appear at least 10 times over all reddit posts. The bag of words approach is optimal for this model because of its proven successes in binary text classification and practicality. Spam filters for most email services utilize a bag of words approach to classify an email as spam or not, which is a binary problem like predicting political lean. As well, the bag of words approach keeps the size of the state space (relatively) small which allows our models to run within a couple of minutes. The tradeoff is an inability for the model to detect syntactical differences between posts or analyze the order in which words appear in a document, which are likely aspects of a human’s mental heuristic function for classification, but are much less important than the words themselves. In preparing this bag of words document-term matrix, I implemented a weighting feature based on the extended Moral Foundations Theory dictionary. For any word that passed my initial filtering criteria (non-stop word appearing >10 times amongst all posts), I reweighted the word by a factor of X if the word appears in the eMFD, where X equals the 1 plus the sum of all moral theme probabilities with the absolute value of the corresponding sentiment scores. This weighting tool allows for a distinction between words with stronger sentiments (in either direction) and probabilities to words also in the dictionary, but with weaker scores. For example, even within the dictionary, a word like murdered (X=5.8) has a much larger weight than a word like new(X=1.5), yet these both are more heavily weighted than a non-dictionary word where the weight is X=1. This serves to emphasize important words in our model based on Moral Foundations Theory as opposed to the non-dictionary words. Furthermore, I maintain a copy of the unweighted bag of words document-term matrix so that I can compare the weighted model’s accuracy with the unweighted model’s accuracy, thus testing how important the eMFD is to Reddit text classification and providing evidence for the validity of my first hypothesis. This works to reduce the black-box nature of our algorithm; by tinkering weighted versus unweighted we can better understand if the words in the eMFD are truly impactful when predicting political lean. 
+
+
+After preparing the data for modeling, I employed five challenger models which utilize different statistical techniques that have been successful in text classification problems. These models were a support vector machine, a naive bayes model, a LogitBoost classifier, a random forest model, and a feed-forward neural network. I trained each model using 80% of our eMFD-weighted Reddit data and tested it with the remaining 20%, discarding 3,784 liberal posts in order to have an even amount of conservative and liberal observations. Upon computing confusion matrices for each model’s accuracy, I deemed the model with the highest accuracy the champion model and discarded all other models. I repeated this process with the unweighted document-term matrix as well. 
+
+
 ```{r, include=FALSE, message=FALSE, warning=FALSE}
 #Predictions going here
 set.seed(650)
@@ -117,8 +167,11 @@ counts <- map_df(1:2,
   anti_join(stop_words, by = "word") %>%
   count(Id, word, sort = TRUE)
 
+counts1<-data.frame(counts)
 
-counts1<-counts
+
+
+
 ##reweighting the words based on the eMFD dictionary 
 
 #If YOU COMMENT OUT NEXT 4 LINES OF CODE, MODEL RUNS W/O weightings! 
@@ -134,32 +187,31 @@ counts_10 <- counts %>%
   filter(n >= 10) %>%
   select(word)
 
+
+
 countsCopy <- counts %>%
   right_join(counts_10, by = "word") %>% drop_na()
+
+
 
 dtm<-countsCopy %>%
   bind_tf_idf(word, Id, n) %>%
   cast_dtm(Id, word, tf_idf)
 
-#testing_dtm <- testing_counts %>%
-  #right_join(testing_10, by = "word") %>%
-  #drop_na() %>% 
-  #bind_tf_idf(word, Id, n) %>%
-  #cast_dtm(Id, word, tf_idf)
 
 dtm<-dtm %>% as.matrix() %>% as.data.frame()
+
 
 # Split Data into Training and Testing in R 
 set.seed(777)
 sample_size = floor(0.8*nrow(dtm))
+
 
 # randomly split data in r
 picked = sample(seq_len(nrow(dtm)),size = sample_size)
 training_dtm =dtm[picked,]
 testing_dtm =dtm[-picked,]
 
-#training_dtm<-training_dtm %>% as.matrix() %>% as.data.frame()
-#testing_dtm<-testing_dtm %>% as.matrix() %>% as.data.frame()
 
 rm(training_counts, training_10, testing_counts, testing_10)
 
@@ -183,10 +235,14 @@ training_dtm<-training_dtm %>% select(-Id)
 testing_dtm<-testing_dtm %>% select(-Id)
 rm(t1, t2)
 
+##doing same for other chunk
+
+
 #key info: test_dtm 
 ```
 
-```{r, message=FALSE, warning=FALSE, echo=FALSE}
+**Weighted Results**
+```{r, message=FALSE, warning=FALSE, echo=FALSE, fig.width=16, fig.height=6}
 library(caret)
 trctrl <- trainControl(method = "none")
 svm_mod <- train(x = training_dtm,
@@ -202,7 +258,7 @@ svm_mod <- train(x = training_dtm,
 svm_pred <- predict(svm_mod,
                     newdata = testing_dtm)
 svm_cm <- confusionMatrix(svm_pred, as.factor(testOutcomes))
-svm_cm
+#svm_cm
 
 #nb_mod <- train(x = training_dtm,
             #    y = as.factor(trainOutcomes),
@@ -263,16 +319,141 @@ svm_cm
 
 #nnet_cm <- confusionMatrix(nnet_pred, as.factor(testOutcomes))
 #nnet_cm
+#https://www.emilhvitfeldt.com/post/2018-03-31-binary-text-classification-with-tidytext-and-caret/
 
 plt <- as.data.frame(svm_cm$table)
 plt$Prediction <- factor(plt$Prediction, levels=rev(levels(plt$Prediction)))
 ggplot(plt, aes(Prediction,Reference, fill= Freq)) +
         geom_tile() + geom_text(aes(label=Freq)) +
         scale_fill_gradient(low="white", high="#009194") +
-        labs(x = "Political Lean",y = "Prediction") +
+        labs(x = "Political Lean",y = "Prediction", title="Weighted Model Results") +
         scale_x_discrete(labels=c("Liberal","Conservative")) +
         scale_y_discrete(labels=c("Conservative","Liberal"))
-```
-https://www.emilhvitfeldt.com/post/2018-03-31-binary-text-classification-with-tidytext-and-caret/
-^Help with running the models
 
+
+```
+
+
+
+**Un-weighted Results**
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE,fig.width=16, fig.height=6 }
+counts<-counts1
+
+
+
+#filtering for words that appear more than 10x(training) and 5x(testing). 
+counts_10 <- counts %>%
+  group_by(word) %>%
+  summarise(n = n()) %>% 
+  filter(n >= 10) %>%
+  select(word)
+
+
+
+countsCopy <- counts %>%
+  right_join(counts_10, by = "word") %>% drop_na()
+
+
+
+dtm<-countsCopy %>%
+  bind_tf_idf(word, Id, n) %>%
+  cast_dtm(Id, word, tf_idf)
+
+
+
+
+dtm<-dtm %>% as.matrix() %>% as.data.frame()
+
+
+# Split Data into Training and Testing in R 
+set.seed(777)
+sample_size = floor(0.8*nrow(dtm))
+
+
+# randomly split data in r
+picked = sample(seq_len(nrow(dtm)),size = sample_size)
+training_dtm =dtm[picked,]
+testing_dtm =dtm[-picked,]
+
+rm(training_counts, training_10, testing_counts, testing_10)
+
+
+reddit_ID<-reddit %>% select(Id,`Political Lean`)
+
+
+training_dtm <- tibble::rownames_to_column(training_dtm, "VALUE") %>% rename(Id=VALUE)
+testing_dtm<-tibble::rownames_to_column(testing_dtm, "VALUE") %>% rename(Id=VALUE)
+training_dtm<-training_dtm %>% arrange(desc(Id))
+testing_dtm<-testing_dtm %>% arrange(desc(Id))
+
+t1<-testing_dtm %>% select(Id)
+t2<-training_dtm %>% select(Id)
+testOutcomes<-reddit_ID %>% inner_join(t1, by="Id") %>% arrange(desc(Id))
+trainOutcomes<-reddit_ID %>% inner_join(t2, by="Id") %>% arrange(desc(Id))
+testOutcomes<-testOutcomes$`Political Lean`
+trainOutcomes<-trainOutcomes$`Political Lean`
+
+training_dtm<-training_dtm %>% select(-Id)
+testing_dtm<-testing_dtm %>% select(-Id)
+rm(t1, t2)
+
+trctrl <- trainControl(method = "none")
+svm_mod <- train(x = training_dtm,
+                 y = as.factor(trainOutcomes),
+                 method = "svmLinearWeights2",
+                 trControl = trctrl,
+                 tuneGrid = data.frame(cost = 1, 
+                                       Loss = 0, 
+
+                                                                           weight = 1))
+svm_pred <- predict(svm_mod,
+                    newdata = testing_dtm)
+svm_cm <- confusionMatrix(svm_pred, as.factor(testOutcomes))
+#svm_cm
+
+
+plt <- as.data.frame(svm_cm$table)
+plt$Prediction <- factor(plt$Prediction, levels=rev(levels(plt$Prediction)))
+ggplot(plt, aes(Prediction,Reference, fill= Freq)) +
+        geom_tile() + geom_text(aes(label=Freq)) +
+        scale_fill_gradient(low="white", high="#009194") +
+        labs(x = "Political Lean",y = "Prediction", title="Unweighted Model Results") +
+        scale_x_discrete(labels=c("Liberal","Conservative")) +
+        scale_y_discrete(labels=c("Conservative","Liberal"))
+
+
+```
+
+# Findings
+
+For this study the support vector machine (previous success in bioinformatics such as gene classification) was the most accurate model and naive bayes (previous success in classifying inbox versus spam emails) was the least accurate model. This was true for both the weighted model, and the unweighted model. For the weighted model, our overall accuracy was 69.25%. It correctly identified 621 liberal posts and 593 conservative posts, while misclassifying 276 conservative posts as liberal, and 263 liberal posts as conservative. Interestingly, the model performed relatively as well with predicting liberal posts as conservative posts. For the unweighted model, our overall accuracy was 71.59%. It correctly identified 622 liberal posts and 633 conservative posts, while misclassifying 257 conservative posts as liberal, and 241 liberal posts as conservative.
+
+# Data Analysis
+
+Based on the models, my first hypothesis that the difference in liberal’s versus conservative’s moral values proposed by Moral Foundations Theory would be identifiable in political Reddit posts is not supported. This is because the model that placed weights on words associated with the moral themes identified in Moral Foundations Theory led to lower accuracy results than the unweighted model that had no prior assumptions. This suggests that by focusing on Moral Foundations Theory, our model missed key clues about the true political lean of a Reddit user. This could be for a multitude of reasons, including: Moral Foundations Theory isn’t a great predictor for political content on Reddit, the themes are mostly absent amongst political posts on Reddit, few differences exist between what liberals and conservatives post on reddit, or there is a limitation in the dataset or algorithm design used in this study. Future studies could look into these reasons to gather more evidence on the potential (lack of) validity of hypothesis #1. 
+
+Based on the data, my second hypothesis that humans are capable of predicting political lean from Reddit posts based on textual clues is partially supported. This is because our model allows for prediction substantially better than guessing, yet does not meet the 80% threshold that I had originally guessed. Given my hypothesis #1 was also unsupported, this result is unsurprising as it was conditioned on the liberal and conservative moral themes being heavily present in Reddit posts. In fact, it provides additional evidence to support the findings that humans benefit greatly from supplemental evidence when analyzing textual data. This is an important area for future research as humans already do a poor job of identifying fake news on news websites that include many supplemental clues to text (Spezzano et al. 3). It begs the question of how well humans can weed out false or biased information on popular websites like Reddit, that are both widespread and relatively anonymous. 
+
+# Limitations and Future Work
+
+This study serves as very preliminary work in answering the proposed hypotheses. A major limitation of the study is our algorithm predicts human performance via machine performance. While there are numerous examples of this working successfully in the field of artificial intelligence, such as the similar task of identifying fake news or the wildly different task of mimicking human conversation, it is impossible to know how humans would fare on predicting political lean of reddit posts without measuring actual human performance. For example, perhaps the syntactic clues of Reddit posts are a large indicator that humans subconsciously account for when reading posts. Or, perhaps conservatives' tendency to favor themes like ingroup loyalty and obedience to authority and liberals' tendency to favor themes like fairness and harm avoidance (Strupp-Levitsky et al.), is more noticeable when looking at strings of words rather than just words themselves.  The bag of words approach used in this study would completely miss these factors, and thus could underrepresent the true prevalence of these themes in Reddit posts.  A natural extension of this study would do exactly that; a diverse group of humans would predict political lean based solely on textual Reddit data and researchers would analyze the accuracy.  While it is unlikely that accuracy results would significantly differ from the model from this study, a study with humans would provide much more direct form of evidence for or against hypotheses #1 and #2. 
+
+Another limitation of this study is that the data is highly skewed towards posts from 2022. As evident in the word clouds and topic models, this allows for current events like Russia’s invasion of Ukraine to dominate the topics of most posts. Future studies could utilize a larger dataset with data over a longer period of time and compare findings to this study. Likewise, future work should aim to extend results beyond just political Subreddits, as political discussion has been proven to be abundant, and perhaps less argumentative, in ordinary Subreddits (Rajadesingan et al. 527).  Comparing model (or human) predictive results across various Subreddits would be insightful in understanding where ideas from Moral foundations Theory appear the most. It is very possible that the prevalence of differing moral themes between conservatives and liberals on Reddit would be higher over a larger dataset where the topics of conversation are not skewed towards one major event. 
+
+
+
+
+# Works Cited 
+
+Feinberg, Matthew, and Robb Willer. “Moral Reframing: A Technique for Effective and Persuasive Communication across Political Divides.” Social and Personality Psychology Compass, vol. 13, no. 12, 2019, https://doi.org/10.1111/spc3.12501. 
+
+Hopp, F.R., Fisher, J.T., Cornell, D. et al. The extended Moral Foundations Dictionary (eMFD): Development and applications of a crowd-sourced approach to extracting moral intuitions from text. Behav Res 53, 232–246 (2021). https://doi.org/10.3758/s13428-020-01433-0
+
+Rajadesingan, Ashwin, Ceren Budak, and Paul Resnick. "Political discussion is abundant in non-political subreddits (and less toxic)." Proceedings of the International AAAI Conference on Web and Social Media. Vol. 15. 2021.
+
+Setty, Vinay, and Erlend Rekve. “Truth Be Told.” Proceedings of the 29th ACM International Conference on Information & Knowledge Management, 2020, https://doi.org/10.1145/3340531.3417463. 
+
+Spezzano, Francesca, et al. “That's Fake News! Reliability of News When Provided Title, Image, Source Bias & Full Article.” Proceedings of the ACM on Human-Computer Interaction, vol. 5, no. CSCW1, 2021, pp. 1–19., https://doi.org/10.1145/3449183. 
+
+Strupp-Levitsky M, Noorbaloochi S, Shipley A, Jost JT (2020) Moral “foundations” as the product of motivated social cognition: Empathy and other psychological underpinnings of ideological divergence in “individualizing” and “binding” concerns. PLOS ONE 15(11): e0241144. https://doi.org/10.1371/journal.pone.0241144
